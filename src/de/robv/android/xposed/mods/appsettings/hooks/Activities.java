@@ -21,6 +21,7 @@ import de.robv.android.xposed.XC_MethodHook;
 import de.robv.android.xposed.XposedBridge;
 import de.robv.android.xposed.mods.appsettings.Common;
 import de.robv.android.xposed.mods.appsettings.XposedMod;
+import de.robv.android.xposed.mods.appsettings.notify.NotificationHelper;
 
 
 public class Activities {
@@ -58,17 +59,6 @@ public class Activities {
 					} else if (fullscreen == Common.FULLSCREEN_PREVENT) {
 						window.clearFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
 						setAdditionalInstanceField(window, PROP_FULLSCREEN, Boolean.FALSE);
-					} else if (fullscreen == Common.FULLSCREEN_IMMERSIVE) {
-						if (Build.VERSION.SDK_INT >= 19) {
-							window.addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
-							setAdditionalInstanceField(window, PROP_FULLSCREEN, Boolean.TRUE);
-
-							View decorView = window.getDecorView();
-							decorView.setSystemUiVisibility(
-									View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
-									| View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
-									| View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
-						}
 					}
 
 					if (XposedMod.prefs.getBoolean(packageName + Common.PREF_NO_TITLE, false))
@@ -91,6 +81,86 @@ public class Activities {
 					}
 				}
 			});
+			
+			if (Build.VERSION.SDK_INT >= 19) {
+				findAndHookMethod(Activity.class, "onResume", new XC_MethodHook() {
+					@SuppressLint("InlinedApi")
+					@Override
+					protected void afterHookedMethod(MethodHookParam param) throws Throwable {
+						Activity activity = (Activity) param.thisObject;
+						String packageName = activity.getPackageName();
+						
+						if (!XposedMod.isActive(packageName))
+							return;
+						
+						int fullscreen;
+						try {
+							fullscreen = XposedMod.prefs.getInt(packageName + Common.PREF_FULLSCREEN,
+									Common.FULLSCREEN_DEFAULT);
+						} catch (ClassCastException ex) {
+							// Legacy boolean setting
+							fullscreen = XposedMod.prefs.getBoolean(packageName + Common.PREF_FULLSCREEN, false)
+									? Common.FULLSCREEN_FORCE : Common.FULLSCREEN_DEFAULT;
+						}
+						if (fullscreen != Common.FULLSCREEN_IMMERSIVE) {
+							return;
+						}
+
+						NotificationHelper.showNotification(activity, activity);
+						
+						if (NotificationHelper.hasUserToggledImmersive() && !NotificationHelper.isImmersive()) {
+							NotificationHelper.setUserToggledImmersive(false);
+							return;
+						}
+						
+						NotificationHelper.setUserToggledImmersive(false);
+						NotificationHelper.setImmersive(true);
+						
+						Window window = activity.getWindow();
+						setAdditionalInstanceField(window, PROP_FULLSCREEN, Boolean.TRUE);
+						window.clearFlags(WindowManager.LayoutParams.FLAG_FORCE_NOT_FULLSCREEN);
+						window.addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
+						window.addFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_NAVIGATION);
+						window.addFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS);
+						View decorView = window.getDecorView();
+						decorView.setSystemUiVisibility(
+				                View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+				                | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+				                | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+				                | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+				                | View.SYSTEM_UI_FLAG_FULLSCREEN
+				                | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
+					}
+				});
+				
+				findAndHookMethod(Activity.class, "onPause", new XC_MethodHook() {
+					@SuppressLint("InlinedApi")
+					@Override
+					protected void afterHookedMethod(MethodHookParam param) throws Throwable {
+						Activity activity = (Activity) param.thisObject;
+						String packageName = activity.getPackageName();
+						
+						if (!XposedMod.isActive(packageName))
+							return;
+						
+						NotificationHelper.dismissNotifications(activity);
+					}
+				});
+				
+				findAndHookMethod(Activity.class, "onDestroy", new XC_MethodHook() {
+					@SuppressLint("InlinedApi")
+					@Override
+					protected void afterHookedMethod(MethodHookParam param) throws Throwable {
+						Activity activity = (Activity) param.thisObject;
+						String packageName = activity.getPackageName();
+						
+						if (!XposedMod.isActive(packageName))
+							return;
+						
+						NotificationHelper.dismissNotifications(activity);
+					}
+				});
+			}
 		} catch (Throwable e) {
 			XposedBridge.log(e);
 		}
