@@ -36,13 +36,13 @@ public class Activities {
 	private static final String PROP_FULLSCREEN = "AppSettings-Fullscreen";
 	private static final String PROP_KEEP_SCREEN_ON = "AppSettings-KeepScreenOn";
 	private static final String PROP_ORIENTATION = "AppSettings-Orientation";
+	private static final String PROP_FS_IMMERSIVE = "AppSettings-FS-Immersive";
 
 	public static void hookActivitySettings() {
 		try {
 			findAndHookMethod("com.android.internal.policy.impl.PhoneWindow", null, "generateLayout",
 					"com.android.internal.policy.impl.PhoneWindow.DecorView", new XC_MethodHook() {
 
-				@SuppressLint("InlinedApi")
 				protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
 					Window window = (Window) param.thisObject;
 					Context context = window.getContext();
@@ -66,6 +66,8 @@ public class Activities {
 					} else if (fullscreen == Common.FULLSCREEN_PREVENT) {
 						window.clearFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
 						setAdditionalInstanceField(window, PROP_FULLSCREEN, Boolean.FALSE);
+					} else if (fullscreen == Common.FULLSCREEN_IMMERSIVE && context instanceof Activity) {
+						setAdditionalInstanceField(context, PROP_FS_IMMERSIVE, Boolean.TRUE);
 					}
 
 					if (XposedMod.prefs.getBoolean(packageName + Common.PREF_NO_TITLE, false))
@@ -88,123 +90,71 @@ public class Activities {
 					}
 					
 					if (XposedMod.prefs.getBoolean(packageName + Common.PREF_TRANS_NAVBAR, false)) {
-						setNavbarTransparent((Activity)context);
+						setNavbarTransparent(window);
 					}
 				}
 			});
 			
 			if (Build.VERSION.SDK_INT >= 19) {
 				findAndHookMethod(Activity.class, "onResume", new XC_MethodHook() {
-					@SuppressLint({ "InlinedApi", "NewApi" })
 					@Override
 					protected void afterHookedMethod(MethodHookParam param) throws Throwable {
 						Activity activity = (Activity) param.thisObject;
-						String packageName = activity.getPackageName();
 						
-						if (!XposedMod.isActive(packageName))
-							return;
-						
-						int fullscreen;
-						try {
-							fullscreen = XposedMod.prefs.getInt(packageName + Common.PREF_FULLSCREEN,
-									Common.FULLSCREEN_DEFAULT);
-						} catch (ClassCastException ex) {
-							return;
-						}
-						if (fullscreen != Common.FULLSCREEN_IMMERSIVE) {
-							return;
-						}
-
-						NotificationHelper.showNotification(activity, activity);
-						
-						if (NotificationHelper.hasUserToggledImmersive() && !NotificationHelper.isImmersive()) {
+						Boolean bForceImmersive = (Boolean) getAdditionalInstanceField(activity, PROP_FS_IMMERSIVE);
+						if (bForceImmersive != null && bForceImmersive) {
+							NotificationHelper.showNotification(activity, activity);
+							
+							if (NotificationHelper.hasUserToggledImmersive() && !NotificationHelper.isImmersive()) {
+								NotificationHelper.setUserToggledImmersive(false);
+								return;
+							}
+							
 							NotificationHelper.setUserToggledImmersive(false);
-							return;
+							NotificationHelper.setImmersive(true);
+							
+							setImmersive(activity);
 						}
-						
-						NotificationHelper.setUserToggledImmersive(false);
-						NotificationHelper.setImmersive(true);
-						
-						setImmersive(activity);
 					}
 				});
 				
 				findAndHookMethod(Activity.class, "onPause", new XC_MethodHook() {
-					@SuppressLint("InlinedApi")
 					@Override
 					protected void afterHookedMethod(MethodHookParam param) throws Throwable {
 						Activity activity = (Activity) param.thisObject;
-						String packageName = activity.getPackageName();
-						
-						if (!XposedMod.isActive(packageName))
-							return;
-						
-						int fullscreen;
-						try {
-							fullscreen = XposedMod.prefs.getInt(packageName + Common.PREF_FULLSCREEN,
-									Common.FULLSCREEN_DEFAULT);
-						} catch (ClassCastException ex) {
-							return;
+
+						Boolean bForceImmersive = (Boolean) getAdditionalInstanceField(activity, PROP_FS_IMMERSIVE);
+						if (bForceImmersive != null && bForceImmersive) {			
+							NotificationHelper.dismissNotifications(activity);
 						}
-						if (fullscreen != Common.FULLSCREEN_IMMERSIVE) {
-							return;
-						}
-						
-						NotificationHelper.dismissNotifications(activity);
 					}
 				});
 				
 				findAndHookMethod(Activity.class, "onDestroy", new XC_MethodHook() {
-					@SuppressLint("InlinedApi")
 					@Override
 					protected void afterHookedMethod(MethodHookParam param) throws Throwable {
 						Activity activity = (Activity) param.thisObject;
-						String packageName = activity.getPackageName();
-						
-						if (!XposedMod.isActive(packageName))
-							return;
-						
-						int fullscreen;
-						try {
-							fullscreen = XposedMod.prefs.getInt(packageName + Common.PREF_FULLSCREEN,
-									Common.FULLSCREEN_DEFAULT);
-						} catch (ClassCastException ex) {
-							return;
+
+						Boolean bForceImmersive = (Boolean) getAdditionalInstanceField(activity, PROP_FS_IMMERSIVE);
+						if (bForceImmersive != null && bForceImmersive) {			
+							NotificationHelper.dismissNotifications(activity);
 						}
-						if (fullscreen != Common.FULLSCREEN_IMMERSIVE) {
-							return;
-						}
-						
-						NotificationHelper.dismissNotifications(activity);
 					}
 				});
 				
 				// Some applications like Dolphin Browser needs re-setting the immersive flag
 				//	once in a while... because they reset the window flags.
 				findAndHookMethod(Activity.class, "onUserInteraction", new XC_MethodHook() {
-					@SuppressLint({ "InlinedApi", "NewApi" })
 					@Override
 					protected void afterHookedMethod(MethodHookParam param) throws Throwable {
 					    super.afterHookedMethod(param);
 					    Activity activity = (Activity)param.thisObject;
-						String packageName = activity.getPackageName();
-
-						if (!XposedMod.isActive(packageName))
-							return;
-						
-						int fullscreen;
-						try {
-							fullscreen = XposedMod.prefs.getInt(packageName + Common.PREF_FULLSCREEN,
-									Common.FULLSCREEN_DEFAULT);
-						} catch (ClassCastException ex) {
-							return;
-						}
-						if (fullscreen != Common.FULLSCREEN_IMMERSIVE) {
-							return;
-						}
-						
-						if (NotificationHelper.isImmersive() && !isImmersive(activity)) {
-							setImmersive(activity);
+					    
+						Boolean bForceImmersive = (Boolean) getAdditionalInstanceField(activity, PROP_FS_IMMERSIVE);
+						if (bForceImmersive != null && bForceImmersive) {			
+							if (NotificationHelper.isImmersive() && !isImmersive(activity)) {
+								setImmersive(activity);
+							}
 						}
 					}
 				});
@@ -314,7 +264,6 @@ public class Activities {
 		activity.setImmersive(true);
 		Window window = activity.getWindow();
 		if (window != null) {
-			setAdditionalInstanceField(window, PROP_FULLSCREEN, Boolean.TRUE);
 			window.clearFlags(WindowManager.LayoutParams.FLAG_FORCE_NOT_FULLSCREEN);
 			window.addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
 			window.addFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_NAVIGATION);
@@ -343,11 +292,7 @@ public class Activities {
 	}
 	
 	@SuppressLint("InlinedApi")
-	private static void setNavbarTransparent(Activity activity) {
-		if (activity == null) {
-			return;
-		}
-		Window window = activity.getWindow();
+	private static void setNavbarTransparent(Window window) {
 		if (window != null) {
 			window.addFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_NAVIGATION);
 			window.addFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS);
