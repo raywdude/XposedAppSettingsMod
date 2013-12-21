@@ -86,6 +86,10 @@ public class Activities {
 						((Activity) context).setRequestedOrientation(Common.orientationCodes[orientation]);
 						setAdditionalInstanceField(context, PROP_ORIENTATION, orientation);
 					}
+					
+					if (XposedMod.prefs.getBoolean(packageName + Common.PREF_TRANS_NAVBAR, false)) {
+						setNavbarTransparent((Activity)context);
+					}
 				}
 			});
 			
@@ -336,5 +340,17 @@ public class Activities {
 			}
 		}
 		return false;
+	}
+	
+	@SuppressLint("InlinedApi")
+	private static void setNavbarTransparent(Activity activity) {
+		if (activity == null) {
+			return;
+		}
+		Window window = activity.getWindow();
+		if (window != null) {
+			window.addFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_NAVIGATION);
+			window.addFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS);
+		}
 	}
 }

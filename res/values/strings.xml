@@ -69,6 +69,7 @@ is enabled in its configuration!</string>
     <string name="settings_screenon">Keep screen on</string>
     <string name="settings_showwhenlocked">Show when locked</string>
     <string name="settings_resident">Resident</string>
+    <string name="settings_transparent_nav">Transparent navbar</string>
     <string name="settings_orientation">Orientation</string>
     <string name="settings_insistentnotif">Insistent notifications</string>
     <string name="settings_nobignotif">No big notifications</string>
