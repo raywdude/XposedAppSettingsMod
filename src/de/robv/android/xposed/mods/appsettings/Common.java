@@ -25,6 +25,7 @@ public class Common {
 	public static final String PREF_XLARGE = "/tablet";
 	public static final String PREF_RESIDENT = "/resident";
 	public static final String PREF_TRANS_NAVBAR = "/transparent-navbar";
+	public static final String PREF_NO_FULLSCREEN_IME = "/no-fullscreen-ime";
 	public static final String PREF_NO_BIG_NOTIFICATIONS = "/no-big-notifications";
 	public static final String PREF_INSISTENT_NOTIF = "/insistent-notif";
 	public static final String PREF_REVOKEPERMS = "/revoke-perms";
