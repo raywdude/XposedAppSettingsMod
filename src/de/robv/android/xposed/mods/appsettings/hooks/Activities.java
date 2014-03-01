@@ -24,8 +24,6 @@ import de.robv.android.xposed.XC_MethodHook;
 import de.robv.android.xposed.XposedBridge;
 import de.robv.android.xposed.mods.appsettings.Common;
 import de.robv.android.xposed.mods.appsettings.XposedMod;
-import de.robv.android.xposed.mods.appsettings.notify.NotificationHelper;
-
 
 public class Activities {
 	@SuppressLint("InlinedApi")
@@ -106,45 +104,11 @@ public class Activities {
 						
 						Boolean bForceImmersive = (Boolean) getAdditionalInstanceField(activity, PROP_FS_IMMERSIVE);
 						if (bForceImmersive != null && bForceImmersive) {
-							NotificationHelper.showNotification(activity, activity);
-							
-							if (NotificationHelper.hasUserToggledImmersive() && !NotificationHelper.isImmersive()) {
-								NotificationHelper.setUserToggledImmersive(false);
-								return;
-							}
-							
-							NotificationHelper.setUserToggledImmersive(false);
-							NotificationHelper.setImmersive(true);
-							
 							setImmersive(activity);
 						}
 					}
 				});
-				
-				findAndHookMethod(Activity.class, "onPause", new XC_MethodHook() {
-					@Override
-					protected void afterHookedMethod(MethodHookParam param) throws Throwable {
-						Activity activity = (Activity) param.thisObject;
 
-						Boolean bForceImmersive = (Boolean) getAdditionalInstanceField(activity, PROP_FS_IMMERSIVE);
-						if (bForceImmersive != null && bForceImmersive) {			
-							NotificationHelper.dismissNotifications(activity);
-						}
-					}
-				});
-				
-				findAndHookMethod(Activity.class, "onDestroy", new XC_MethodHook() {
-					@Override
-					protected void afterHookedMethod(MethodHookParam param) throws Throwable {
-						Activity activity = (Activity) param.thisObject;
-
-						Boolean bForceImmersive = (Boolean) getAdditionalInstanceField(activity, PROP_FS_IMMERSIVE);
-						if (bForceImmersive != null && bForceImmersive) {			
-							NotificationHelper.dismissNotifications(activity);
-						}
-					}
-				});
-				
 				// Some applications like Dolphin Browser needs re-setting the immersive flag
 				//	once in a while... because they reset the window flags.
 				findAndHookMethod(Activity.class, "onUserInteraction", new XC_MethodHook() {
@@ -155,9 +119,7 @@ public class Activities {
 					    
 						Boolean bForceImmersive = (Boolean) getAdditionalInstanceField(activity, PROP_FS_IMMERSIVE);
 						if (bForceImmersive != null && bForceImmersive) {			
-							if (NotificationHelper.isImmersive() && !isImmersive(activity)) {
 								setImmersive(activity);
-							}
 						}
 					}
 				});
@@ -292,22 +254,6 @@ public class Activities {
 				decorView.setSystemUiVisibility(IMMERSIVE_SYSTEM_UI_FLAGS);
 			}
 		}
-	}
-	
-	private static boolean isImmersive(Activity activity) {
-		if (activity == null) {
-			return false;
-		}
-		Window window = activity.getWindow();
-		if (window != null) {
-			View decorView = window.getDecorView();
-			if (decorView != null) {
-				if ((decorView.getSystemUiVisibility() & IMMERSIVE_SYSTEM_UI_FLAGS) == IMMERSIVE_SYSTEM_UI_FLAGS) {
-					return true;
-				}
-			}
-		}
-		return false;
 	}
 	
 	@SuppressLint("InlinedApi")
